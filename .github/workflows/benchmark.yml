@@ -1,0 +1,65 @@
+name: benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Number of runs per arm
+        required: false
+        default: "6"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        next: ["16.3.3", "16.4.0-canary.8"]
+        node: ["22", "23", "24", "25", "26"]
+
+    name: next@${{ matrix.next }} on node@${{ matrix.node }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Pin the Next.js version for this job
+        run: npm pkg set dependencies.next=${{ matrix.next }}
+
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Check telemetry is enabled
+        run: node node_modules/next/dist/bin/next telemetry status
+
+      - name: Benchmark
+        env:
+          RUNS: ${{ inputs.runs || '6' }}
+        run: pnpm benchmark
+
+      - name: Publish summary
+        if: always()
+        run: |
+          {
+            echo "## next@${{ matrix.next }} on node@${{ matrix.node }}"
+            echo
+            echo '```json'
+            cat benchmark-results.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-next-${{ matrix.next }}-node-${{ matrix.node }}
+          path: benchmark-results.json
