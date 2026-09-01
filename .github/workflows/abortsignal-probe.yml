@@ -1,0 +1,40 @@
+name: abortsignal-probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["probe/**"]
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22", "23", "24", "25", "26"]
+
+    name: node@${{ matrix.node }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Probe
+        run: |
+          {
+            echo "## node@${{ matrix.node }}"
+            echo
+            echo "| node | ponyfill signal | postNextTelemetryPayload | rejection |"
+            echo "| --- | --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/abortsignal-probe.mjs
