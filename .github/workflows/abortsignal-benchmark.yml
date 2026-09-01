@@ -1,0 +1,58 @@
+name: abortsignal-benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Number of runs per arm
+        required: false
+        default: "6"
+  push:
+    branches: ["probe/**"]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["22", "25"]
+
+    name: node@${{ matrix.node }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Check telemetry is enabled
+        run: node node_modules/next/dist/bin/next telemetry status
+
+      - name: Benchmark the released build
+        env:
+          RUNS: ${{ inputs.runs || '6' }}
+        run: |
+          pnpm benchmark
+          mv benchmark-results.json stock.json
+
+      - name: Swap the ponyfill for the native AbortController
+        run: node scripts/patch-abortsignal.mjs
+
+      - name: Benchmark the patched build
+        env:
+          RUNS: ${{ inputs.runs || '6' }}
+        run: |
+          pnpm benchmark
+          mv benchmark-results.json patched.json
+
+      - name: Compare
+        run: node scripts/compare-benchmarks.mjs stock.json patched.json
