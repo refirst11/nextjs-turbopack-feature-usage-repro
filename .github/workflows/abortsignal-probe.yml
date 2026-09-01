@@ -13,8 +13,9 @@ jobs:
       matrix:
         # Node 20 is omitted: pnpm 11 requires node:sqlite, which 20 lacks.
         node: ["22", "23", "24", "25", "26"]
+        next: ["16.3.3", "16.4.0-canary.8"]
 
-    name: node@${{ matrix.node }}
+    name: next@${{ matrix.next }} on node@${{ matrix.node }}
 
     steps:
       - uses: actions/checkout@v4
@@ -27,13 +28,16 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
+      - name: Pin the Next.js version for this job
+        run: npm pkg set dependencies.next=${{ matrix.next }}
+
       - name: Install
         run: pnpm install --no-frozen-lockfile
 
       - name: Probe
         run: |
           {
-            echo "## node@${{ matrix.node }}"
+            echo "## next@${{ matrix.next }} on node@${{ matrix.node }}"
             echo
             echo "| node | ponyfill signal | postNextTelemetryPayload | rejection |"
             echo "| --- | --- | --- | --- |"
