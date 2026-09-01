@@ -37,22 +37,50 @@ jobs:
       - name: Check telemetry is enabled
         run: node node_modules/next/dist/bin/next telemetry status
 
-      - name: Benchmark the released build
+      - name: Snapshot the released dist
+        run: node scripts/dist-snapshot.mjs save
+
+      # Four builds of the same project, differing only in which patches are
+      # applied. Every arm starts from the restored release.
+      - name: Arm 1 — released build
         env:
           RUNS: ${{ inputs.runs || '6' }}
         run: |
           pnpm benchmark
           mv benchmark-results.json stock.json
 
-      - name: Swap the ponyfill for the native AbortController
-        run: node scripts/patch-abortsignal.mjs
-
-      - name: Benchmark the patched build
+      - name: Arm 2 — native AbortController only
         env:
           RUNS: ${{ inputs.runs || '6' }}
         run: |
+          node scripts/dist-snapshot.mjs restore
+          node scripts/patch-abortsignal.mjs
           pnpm benchmark
-          mv benchmark-results.json patched.json
+          mv benchmark-results.json signal.json
+
+      - name: Arm 3 — PR #97981 only
+        env:
+          RUNS: ${{ inputs.runs || '6' }}
+        run: |
+          node scripts/dist-snapshot.mjs restore
+          node scripts/patch-pr97981.mjs
+          pnpm benchmark
+          mv benchmark-results.json pr.json
+
+      - name: Arm 4 — PR #97981 and native AbortController
+        env:
+          RUNS: ${{ inputs.runs || '6' }}
+        run: |
+          node scripts/dist-snapshot.mjs restore
+          node scripts/patch-pr97981.mjs
+          node scripts/patch-abortsignal.mjs
+          pnpm benchmark
+          mv benchmark-results.json both.json
 
       - name: Compare
-        run: node scripts/compare-benchmarks.mjs stock.json patched.json
+        run: |
+          node scripts/compare-benchmarks.mjs \
+            "released=stock.json" \
+            "native AbortController=signal.json" \
+            "PR #97981=pr.json" \
+            "PR #97981 + native AbortController=both.json"

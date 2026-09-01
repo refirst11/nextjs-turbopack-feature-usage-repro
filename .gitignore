@@ -46,3 +46,5 @@ next-env.d.ts
 # md
 issue-facts.md
 abortsignal-facts.md
+# dist snapshot for benchmarking
+.dist-snapshot/
